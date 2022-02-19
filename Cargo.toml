@@ -1,0 +1,22 @@
+[package]
+name = "meta-croc-operator"
+version = "0.1.0"
+edition = "2021"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+axum = "0.4"
+hyper = { version = "0.14", features = ["server", "stream", "http2"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+futures = "0.3"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+kube = { version = "0.68.0", features = ["runtime", "derive"] }
+k8s-openapi = { version = "0.14.0", features = ["v1_22"] }
+color-eyre = "0.6"
+
+# [profile.release]
+# lto = "fat"
+# codegen-units = 1
