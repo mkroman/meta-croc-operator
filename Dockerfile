@@ -13,7 +13,6 @@ FROM debian:11.2-slim
 ARG created
 
 LABEL org.opencontainers.image.authors="Mikkel Kroman <mk@maero.dk>"
-LABEL org.opencontainers.image.url="https://github.com/mkroman/meta"
 
 RUN apt update \
   && apt install -y openssl ca-certificates
