@@ -1,10 +1,5 @@
-use std::net::SocketAddr;
 use std::sync::Arc;
 
-use axum::{
-    routing::{get, post},
-    Json, Router,
-};
 use clap::Parser;
 use color_eyre::eyre;
 use futures::{StreamExt, TryStreamExt};
@@ -21,12 +16,13 @@ use tracing::{debug, instrument, trace};
 mod api;
 mod cli;
 mod error;
+mod http;
 mod job;
 
 use api::CreateJob;
 pub use error::Error;
 
-struct State {
+pub struct State {
     pub client: Client,
 }
 
@@ -131,61 +127,9 @@ async fn main() -> eyre::Result<()> {
         }
     });
 
-    // build our application with a route
-    let app = Router::new()
-        // `GET /` goes to `root`
-        .route("/", get(http::root))
-        .route(
-            "/jobs",
-            post({
-                let shared_state = state.clone();
-                move |req: Json<CreateJob>| http::create_job(req, shared_state)
-            }),
-        )
-        .route("/jobs", get(move || http::jobs(Arc::clone(&state))));
+    let http_server = http::start_server(state.clone());
 
-    // run our app with hyper
-    // `axum::Server` is a re-export of `hyper::Server`
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    debug!("listening on {}", addr);
-
-    let server = tokio::spawn(async move {
-        axum::Server::bind(&addr)
-            .serve(app.into_make_service())
-            .await
-    });
-
-    let _ = tokio::join!(server, watch_jobs(client.clone(), tx), watch_reporter);
+    let _ = tokio::join!(http_server, watch_jobs(client.clone(), tx), watch_reporter);
 
     Ok(())
-}
-
-mod http {
-    use super::*;
-
-    pub(crate) async fn create_job(
-        Json(request): Json<CreateJob>,
-        state: Arc<State>,
-    ) -> Json<Result<Job, ()>> {
-        trace!(?request, "create job request");
-
-        let result = super::create_job(state.client.clone(), request)
-            .await
-            .map_err(|_| ());
-
-        Json(result)
-    }
-
-    pub(crate) async fn jobs(state: Arc<State>) -> Json<Vec<Job>> {
-        let jobs = list_jobs(state.client.clone())
-            .await
-            .map_or_else(|_| vec![], |x| x.items);
-
-        Json(jobs)
-    }
-
-    // basic handler that responds with a static string
-    pub(crate) async fn root() -> &'static str {
-        "Hello, World!"
-    }
 }
