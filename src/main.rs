@@ -41,9 +41,9 @@ name="$(basename "${filename}")"
 hash=$(xxh128sum "$filename" | awk '{ print $1 }')
 subpath="${hash:0:2}/${hash}/${name}"
 
-aws --endpoint-url "${AWS_ENDPOINT}" s3 cp "${filename}" "s3://rwx/${subpath}"
+aws --endpoint-url "${AWS_ENDPOINT}" s3 cp "${filename}" "s3://${S3_BUCKET}/${subpath}"
 
-url="https://io.rwx.im/rwx/${subpath}"
+url="${PUBLIC_URL_PREFIX}${subpath}"
 "#;
 
 struct State {
@@ -131,7 +131,15 @@ async fn create_job(client: Client, request: CreateJob) -> eyre::Result<Job> {
                             {
                                 "name": "AWS_ENDPOINT",
                                 "value": "vault:secret/data/meta/io#AWS_ENDPOINT"
-                            }
+                            },
+                            {
+                                "name": "S3_BUCKET",
+                                "value": "rwx"
+                            },
+                            {
+                                "name": "PUBLIC_URL_PREFIX",
+                                "value": "https://io.rwx.im/rwx/"
+                            },
                         ],
                         "volumeMounts": [{
                             "name": "data",
