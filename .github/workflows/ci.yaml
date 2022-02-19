@@ -7,7 +7,7 @@ on:
 
 jobs:
   check:
-    name: Check
+    name: Check Code Quality
     runs-on: ubuntu-latest
     steps:
     - name: Check out code
@@ -19,7 +19,8 @@ jobs:
         toolchain: stable
         override: true
         components: rustfmt, clippy
-    - uses: actions/cache@v2
+    - name: Cache Cargo
+      uses: actions/cache@v2
       with:
         path: |
           ~/.cargo/bin/
@@ -30,19 +31,71 @@ jobs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
           ${{ runner.os }}-cargo-
-    - uses: actions-rs/clippy-check@v1
+    - name: Run Clippy check
+      uses: actions-rs/clippy-check@v1
       if: ${{ github.token }}
       with:
         token: ${{ github.token }}
         args: --all-features
-    - name: SonarCloud Scan
+    - name: SonarCloud scan
       uses: SonarSource/sonarcloud-github-action@master
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
+  diff:
+    name: Determine changes
+    runs-on: ubuntu-latest
+    outputs:
+      images: ${{ steps.image-list.outputs.changed-images-json }}
+    steps:
+    - name: Checkout source code
+      uses: actions/checkout@v2
+    - name: Gather list of changed container images
+      id: image-list
+      run: hack/changed-container-images.sh "${{ github.event.before }}"
+
+  containers:
+    name: Build Container Images
+    runs-on: ubuntu-latest
+    needs:
+    - diff
+    if: ${{ needs.diff.outputs.images }}
+    strategy:
+      matrix:
+        image: ${{ fromJSON(needs.diff.outputs.images) }}
+    steps:
+    - name: Checkout source code
+      uses: actions/checkout@v2
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v1
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Docker meta
+      id: meta
+      uses: docker/metadata-action@v3
+      with:
+        images: ghcr.io/mkroman/${{ matrix.image }}
+        tags: |
+          type=edge
+          type=semver,pattern={{version}}
+          type=sha,format=long,prefix=
+    - name: Build and push
+      uses: docker/build-push-action@v2
+      with:
+        context: images/${{ matrix.image }}/
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
   container:
-    name: Build container image
+    name: Build Container Image
     runs-on: ubuntu-latest
     needs:
     - check
