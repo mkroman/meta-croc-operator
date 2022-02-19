@@ -17,6 +17,7 @@ kube = { version = "0.68.0", features = ["runtime", "derive"] }
 k8s-openapi = { version = "0.14.0", features = ["v1_22"] }
 color-eyre = "0.6"
 clap = { version = "3.1.0", features = ["derive"] }
+thiserror = "1.0"
 
 # [profile.release]
 # lto = "fat"

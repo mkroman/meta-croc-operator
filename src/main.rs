@@ -12,7 +12,7 @@ use k8s_openapi::api::batch::v1::Job;
 use kube::{
     api::{Api, ListParams, Patch, PatchParams, PostParams},
     runtime::utils::try_flatten_applied,
-    Client, Error,
+    Client,
 };
 use serde_json::json;
 use tokio::sync::mpsc;
@@ -20,9 +20,11 @@ use tracing::{debug, instrument, trace};
 
 mod api;
 mod cli;
+mod error;
 mod job;
 
 use api::CreateJob;
+use error::Error;
 
 /// The default container image to use when none is provided in a `CreateJob` request.
 const DEFAULT_IMAGE: &str = "ghcr.io/rwx-im/croc:edge";
@@ -66,7 +68,7 @@ async fn list_jobs(client: Client) -> Result<kube::core::ObjectList<Job>, Error>
 }
 
 #[instrument(skip(client))]
-async fn create_job(client: Client, request: CreateJob) -> eyre::Result<Job> {
+async fn create_job(client: Client, request: CreateJob) -> Result<Job, Error> {
     let image = request.image.unwrap_or_else(|| DEFAULT_IMAGE.to_owned());
     let my_job = serde_json::from_value(json!({
         "apiVersion": "batch/v1",
@@ -162,7 +164,7 @@ async fn create_job(client: Client, request: CreateJob) -> eyre::Result<Job> {
 pub async fn notify_job_status() {}
 
 #[instrument(skip(client, tx))]
-pub async fn watch_jobs(client: Client, tx: mpsc::UnboundedSender<Job>) -> eyre::Result<()> {
+pub async fn watch_jobs(client: Client, tx: mpsc::UnboundedSender<Job>) -> Result<(), Error> {
     trace!("Watching jobs");
 
     let api = Api::<Job>::namespaced(client, DEFAULT_NAMESPACE);
@@ -198,7 +200,7 @@ pub async fn watch_jobs(client: Client, tx: mpsc::UnboundedSender<Job>) -> eyre:
                 .unwrap();
             }
 
-            tx.send(job)?;
+            tx.send(job).map_err(|_| Error::MpscSendFailed)?;
         }
     }
 
@@ -216,7 +218,7 @@ async fn main() -> eyre::Result<()> {
     color_eyre::install()?;
     init_tracing();
 
-    let opts = cli::Opts::parse();
+    let _opts = cli::Opts::parse();
 
     // Initialize a Kubernetes client and infer the config from the environment.
     let client = Client::try_default().await?;
