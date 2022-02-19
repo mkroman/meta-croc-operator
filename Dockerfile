@@ -17,7 +17,7 @@ LABEL org.opencontainers.image.url="https://github.com/mkroman/meta"
 RUN apt update \
   && apt install -y openssl ca-certificates
 
-COPY --from=builder /usr/src/app/target/release/meta-croc-operator /usr/local/bin/meta-croc-operator
+COPY --from=builder /usr/src/target/release/meta-croc-operator /usr/local/bin/meta-croc-operator
 
 EXPOSE 3000
 

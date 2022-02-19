@@ -10,5 +10,4 @@ RUN apk add --no-cache \
   ruby
 
 USER nobody
-
 ENTRYPOINT ["/bin/bash"]
