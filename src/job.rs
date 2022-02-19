@@ -1,6 +1,5 @@
-use tracing::debug;
-
 use k8s_openapi::api::batch::v1::Job;
+use tracing::debug;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Progress {

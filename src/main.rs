@@ -5,6 +5,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use clap::Parser;
 use color_eyre::eyre;
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::batch::v1::Job;
@@ -13,12 +14,15 @@ use kube::{
     runtime::utils::try_flatten_applied,
     Client, Error,
 };
-use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::sync::mpsc;
 use tracing::{debug, instrument, trace};
 
+mod api;
+mod cli;
 mod job;
+
+use api::CreateJob;
 
 /// The default container image to use when none is provided in a `CreateJob` request.
 const DEFAULT_IMAGE: &str = "ghcr.io/rwx-im/croc:edge";
@@ -48,13 +52,6 @@ url="${PUBLIC_URL_PREFIX}${subpath}"
 
 struct State {
     pub client: Client,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-struct CreateJob {
-    pub image: Option<String>,
-    pub args: Vec<String>,
-    pub code: String,
 }
 
 async fn list_jobs(client: Client) -> Result<kube::core::ObjectList<Job>, Error> {
@@ -208,20 +205,24 @@ pub async fn watch_jobs(client: Client, tx: mpsc::UnboundedSender<Job>) -> eyre:
     Ok(())
 }
 
-#[tokio::main]
-async fn main() -> eyre::Result<()> {
-    color_eyre::install()?;
-    // initialize tracing
+fn init_tracing() {
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
+}
 
+#[tokio::main]
+async fn main() -> eyre::Result<()> {
+    color_eyre::install()?;
+    init_tracing();
+
+    let opts = cli::Opts::parse();
+
+    // Initialize a Kubernetes client and infer the config from the environment.
     let client = Client::try_default().await?;
+    let apiserver_version = client.apiserver_version().await?;
 
-    debug!(
-        "APIServer version: {:#?}",
-        client.apiserver_version().await?
-    );
+    debug!(?apiserver_version, "connected");
 
     // Create an unbounded mpsc channel for receiving messages about jobs that have finished.
     let (tx, mut rx) = mpsc::unbounded_channel::<Job>();
