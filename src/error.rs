@@ -8,4 +8,6 @@ pub enum Error {
     KubeWatcher(#[from] kube::runtime::watcher::Error),
     #[error("Could not send mpsc message")]
     MpscSendFailed,
+    #[error("Could not create Job manifest")]
+    JobManifestFailed(#[source] serde_json::Error),
 }
