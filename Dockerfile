@@ -4,6 +4,7 @@ WORKDIR /usr/src
 
 COPY . .
 
+RUN cargo fetch
 RUN cargo build --release
 RUN strip --strip-unneeded target/release/meta-croc-operator
 
